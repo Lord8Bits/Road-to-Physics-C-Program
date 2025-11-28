@@ -7,9 +7,9 @@
 #include <unistd.h>
 
 #define WORLD_SIZE 40
-#define EPSILON 0.67f // EPSILON defines the fraction of the velocity the wall absorbs.
+#define EPSILON 1.0f // EPSILON defines the fraction of the velocity the wall absorbs.
 #define GRAVITY 0.0f
-
+#define SUB_STEPS 10000.0f
 int n_collision = 0;
 
 struct Object1D
@@ -46,34 +46,42 @@ void object_collision(struct Object1D *object1, struct Object1D *object2)
 // Physics function that updates the player position as well as the velocity, gravity's influence, impact absorption and Object collision.
 void update_physics(struct Object1D *Objects, int object_count)
 {
-    for (int i = 0; i < object_count; i++)
+    // We move the "Time" forward in small slices
+    float dt = 1.0f / SUB_STEPS;
+
+    for (int step = 0; step < SUB_STEPS; step++)
     {
-        struct Object1D *current_object = &Objects[i];
-
-        current_object->velocity += GRAVITY; // Gravity > 0 falls to the right, Gravity < 0 falls to the left.
-        current_object->pos += current_object->velocity; // Updates position by velocity
-
-        // Bounce Considering the walls have infinite mass, absorbs part of the impact, and player is indestructible:
-        if (current_object->pos <= 0.0f)
+        // 1. Move EVERY object a tiny bit
+        for (int i = 0; i < object_count; i++)
         {
-            current_object->velocity *= -EPSILON; // Velocity after collision with an object of infinite mass equals to initial_velocity * (-epsilon), epsilon represents the impact absorption factor.
-            current_object->pos = 0.0f;
+            struct Object1D *obj = &Objects[i];
+
+            // Apply Gravity (Scaled by the tiny time step)
+            obj->velocity += GRAVITY * dt;
+
+            // Move only a fraction of the total velocity
+            obj->pos += obj->velocity * dt;
+
+            // 2. Check Wall Collision immediately
+            if (obj->pos <= 0.0f) {
+                n_collision += 1;
+                obj->velocity *= -EPSILON;
+                obj->pos = 0.0f;
+            }
+            else if (obj->pos >= WORLD_SIZE - 1) {
+                obj->velocity *= -EPSILON;
+                obj->pos = WORLD_SIZE - 1;
+            }
         }
-        else if (current_object->pos >= WORLD_SIZE-1)
+        for (int i = 0; i < object_count-1; i++)
         {
-            current_object->velocity *= -EPSILON;
-            current_object->pos = WORLD_SIZE-1;
-        }
-    }
+            struct Object1D *obj1 = &Objects[i];
 
-    for (int i = 0; i < object_count-1; i++)
-    {
-        struct Object1D *obj1 = &Objects[i];
-
-        for (int j = object_count-1; j > i; j--)
-        {
-            struct Object1D *obj2 = &Objects[j];
-            object_collision(obj1, obj2);
+            for (int j = object_count-1; j > i; j--)
+            {
+                struct Object1D *obj2 = &Objects[j];
+                object_collision(obj1, obj2);
+            }
         }
     }
 }
@@ -130,8 +138,8 @@ int main(void)
     char space[WORLD_SIZE]; // The world in which our object will move.
 
     struct Object1D Objects[2];
-    struct Object1D object1 = {1.0f, input_velocity, 1000.0f, input_icon};
-    struct Object1D object2 = {3.0f, 0.0f, 1.0f, 'O'};
+    struct Object1D object1 = {20.0f, input_velocity, 100000000.0f, input_icon};
+    struct Object1D object2 = {5.0f, 0.0f, 1.0f, 'O'};
 
     Objects[0] = object1;
     Objects[1] = object2;
@@ -141,7 +149,7 @@ int main(void)
     {
         update_physics(Objects, 2);
         render(space, WORLD_SIZE, Objects, 2);
-        usleep(16000);
+        usleep(50000);
     }
     return EXIT_SUCCESS;
 }
