@@ -6,37 +6,37 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define WORLD_SIZE 40
-#define EPSILON 1.0f // EPSILON defines the fraction of the velocity the wall absorbs.
-#define GRAVITY 0.0f
-#define SUB_STEPS 10000.0f
+#define WORLD_SIZE 150
+#define EPSILON 1.0 // EPSILON defines the fraction of the velocity the wall absorbs.
+#define GRAVITY 0.0
+#define SUB_STEPS 10000000.0
 int n_collision = 0;
 
 struct Object1D
 {
-    float pos; // Position of the object in the x-axis
-    float velocity; // Velocity vector
-    float mass;
+    double pos; // Position of the object in the x-axis
+    double velocity; // Velocity vector
+    double mass;
     char icon; // Icon to represent the object
 };
 
 void object_collision(struct Object1D *object1, struct Object1D *object2)
 {
-    const float dist = object1->pos - object2->pos;
-    if (fabsf(dist) <= 0.5f)
+    const double dist = object1->pos - object2->pos;
+    if (fabs(dist) <= 0.5)
     {
-        const float obj_velo1 = object1->velocity;
-        const float obj_velo2 = object2->velocity;
+        const double obj_velo1 = object1->velocity;
+        const double obj_velo2 = object2->velocity;
 
-        const float relative_velo = obj_velo1 - obj_velo2;
+        const double relative_velo = obj_velo1 - obj_velo2;
         /* If obj1 moves to the left and is to the left then no collision.
          * If it is to the left, and it moves at the opposite direction (so negative * positive) then there is a collision and vice versa.
          */
-        if (relative_velo * dist < 0)
+        if (relative_velo * dist < 0.0)
         {
             n_collision += 1;
-            const float obj_mass1 = object1->mass;
-            const float obj_mass2 = object2->mass;
+            const double obj_mass1 = object1->mass;
+            const double obj_mass2 = object2->mass;
 
             object1->velocity = ((obj_mass1 - obj_mass2)*obj_velo1 + (2 * obj_mass2)*obj_velo2)/(obj_mass1 + obj_mass2);
             object2->velocity = ((obj_mass2 - obj_mass1)*obj_velo2 + (2 * obj_mass1)*obj_velo1)/(obj_mass1 + obj_mass2);
@@ -47,7 +47,7 @@ void object_collision(struct Object1D *object1, struct Object1D *object2)
 void update_physics(struct Object1D *Objects, int object_count)
 {
     // We move the "Time" forward in small slices
-    float dt = 1.0f / SUB_STEPS;
+    constexpr double dt = 1.0 / SUB_STEPS;
 
     for (int step = 0; step < SUB_STEPS; step++)
     {
@@ -63,10 +63,10 @@ void update_physics(struct Object1D *Objects, int object_count)
             obj->pos += obj->velocity * dt;
 
             // 2. Check Wall Collision immediately
-            if (obj->pos <= 0.0f) {
+            if (obj->pos <= 0.0) {
                 n_collision += 1;
                 obj->velocity *= -EPSILON;
-                obj->pos = 0.0f;
+                obj->pos = 0.0;
             }
             else if (obj->pos >= WORLD_SIZE - 1) {
                 obj->velocity *= -EPSILON;
@@ -126,10 +126,10 @@ void render(char *worldBuffer, int size, const struct Object1D *Objects, int obj
 
 int main(void)
 {
-    float input_velocity;
+    double input_velocity;
     char input_icon;
     printf("Enter the desired velocity for the object: ");
-    scanf("%f", &input_velocity);
+    scanf("%lf", &input_velocity);
 
     printf("Enter the desired icon for the object: ");
     scanf(" %c", &input_icon);
@@ -138,8 +138,8 @@ int main(void)
     char space[WORLD_SIZE]; // The world in which our object will move.
 
     struct Object1D Objects[2];
-    struct Object1D object1 = {20.0f, input_velocity, 100000000.0f, input_icon};
-    struct Object1D object2 = {5.0f, 0.0f, 1.0f, 'O'};
+    struct Object1D object1 = {30.0f, input_velocity, pow(100.0, 7), input_icon};
+    struct Object1D object2 = {20.0f, 0.0f, 1.0f, 'o'};
 
     Objects[0] = object1;
     Objects[1] = object2;
