@@ -1,7 +1,6 @@
 // We will create a 1D space where we will learn how to use structs and pointers.
 // This exercise also serves as a way to get more in depth on how spaces in math work, and later on make 2D and 3D
 // spaces to use physics!
-
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +10,8 @@
 #define EPSILON 0.67f // EPSILON defines the fraction of the velocity the wall absorbs.
 #define GRAVITY 0.0f
 
+int n_collision = 0;
+
 struct Object1D
 {
     float pos; // Position of the object in the x-axis
@@ -19,68 +20,99 @@ struct Object1D
     char icon; // Icon to represent the object
 };
 
-// Physics function that updates the player position as well as the velocity, gravity's influence and impact absorption.
-void update_physics(struct Object1D *object)
-{
-    object->velocity += GRAVITY; // Gravity > 0 falls to the right, Gravity < 0 falls to the left.
-    object->pos += object->velocity; // Updates position by velocity
-
-    // Bounce Considering the walls have infinite mass, absorbs part of the impact, and player is indestructible:
-    if (object->pos <= 0.0f)
-    {
-        object->velocity *= -EPSILON; // Velocity after collision with an object of infinite mass equals to initial_velocity * (-epsilon), epsilon represents the impact absorption factor.
-        object->pos = 0.0f;
-    }
-    else if (object->pos >= WORLD_SIZE-1)
-    {
-        object->velocity *= -EPSILON;
-        object->pos = WORLD_SIZE-1;
-    }
-}
-
 void object_collision(struct Object1D *object1, struct Object1D *object2)
 {
-    if (fabsf(object1->pos - object2->pos) <= 0.5f)
+    const float dist = object1->pos - object2->pos;
+    if (fabsf(dist) <= 0.5f)
     {
-        const float obj_mass1 = object1->mass;
-        const float obj_mass2 = object2->mass;
         const float obj_velo1 = object1->velocity;
         const float obj_velo2 = object2->velocity;
 
-        object1->velocity = ((obj_mass1 - obj_mass2)*obj_velo1 + (2 * obj_mass2)*obj_velo2)/(obj_mass1 + obj_mass2);
-        object2->velocity = ((obj_mass2 - obj_mass1)*obj_velo2 + (2 * obj_mass1)*obj_velo1)/(obj_mass1 + obj_mass2);
+        const float relative_velo = obj_velo1 - obj_velo2;
+        /* If obj1 moves to the left and is to the left then no collision.
+         * If it is to the left, and it moves at the opposite direction (so negative * positive) then there is a collision and vice versa.
+         */
+        if (relative_velo * dist < 0)
+        {
+            n_collision += 1;
+            const float obj_mass1 = object1->mass;
+            const float obj_mass2 = object2->mass;
+
+            object1->velocity = ((obj_mass1 - obj_mass2)*obj_velo1 + (2 * obj_mass2)*obj_velo2)/(obj_mass1 + obj_mass2);
+            object2->velocity = ((obj_mass2 - obj_mass1)*obj_velo2 + (2 * obj_mass1)*obj_velo1)/(obj_mass1 + obj_mass2);
+        }
+    }
+}
+// Physics function that updates the player position as well as the velocity, gravity's influence, impact absorption and Object collision.
+void update_physics(struct Object1D *Objects, int object_count)
+{
+    for (int i = 0; i < object_count; i++)
+    {
+        struct Object1D *current_object = &Objects[i];
+
+        current_object->velocity += GRAVITY; // Gravity > 0 falls to the right, Gravity < 0 falls to the left.
+        current_object->pos += current_object->velocity; // Updates position by velocity
+
+        // Bounce Considering the walls have infinite mass, absorbs part of the impact, and player is indestructible:
+        if (current_object->pos <= 0.0f)
+        {
+            current_object->velocity *= -EPSILON; // Velocity after collision with an object of infinite mass equals to initial_velocity * (-epsilon), epsilon represents the impact absorption factor.
+            current_object->pos = 0.0f;
+        }
+        else if (current_object->pos >= WORLD_SIZE-1)
+        {
+            current_object->velocity *= -EPSILON;
+            current_object->pos = WORLD_SIZE-1;
+        }
+    }
+
+    for (int i = 0; i < object_count-1; i++)
+    {
+        struct Object1D *obj1 = &Objects[i];
+
+        for (int j = object_count-1; j > i; j--)
+        {
+            struct Object1D *obj2 = &Objects[j];
+            object_collision(obj1, obj2);
+        }
     }
 }
 
-void render(char *worldBuffer, int size, const struct Object1D *object) {
+void render(char *worldBuffer, int size, const struct Object1D *Objects, int object_count) {
     // 1. CLEAR the buffer (loop through and set to '.')
     for (int i = 0; i < size; i++)
-    {
         worldBuffer[i] = '.';
-    }
-    // 2. PROJECT player position (cast float to int)
-    const int player_pos = (int)object->pos;
-    // 3. DRAW player into buffer (handle out-of-bounds!)
-    if (player_pos < 0)
+
+    for (int i = 0; i < object_count; i++)
     {
-        worldBuffer[0] = object->icon;
+        const struct Object1D *current = &Objects[i];
+
+        // 2. PROJECT player position (cast float to int)
+        const int player_pos = (int)current->pos;
+
+        // 3. DRAW player into buffer (handle out-of-bounds!)
+        if (player_pos < 0)
+        {
+            worldBuffer[0] = current->icon;
+        }
+        else if (player_pos >= size)
+        {
+            worldBuffer[size-1] = current->icon;
+        }
+        else
+        {
+            worldBuffer[player_pos] = current->icon;
+        }
     }
-    else if (player_pos >= size)
-    {
-        worldBuffer[size-1] = object->icon;
-    }
-    else
-    {
-        worldBuffer[player_pos] = object->icon;
-    }
+
     // 4. PRINT the buffer
     printf("\033[H"); // Returns to the beginning of the line to overwrite the previous output.
     printf("|");
 
     for (int i = 0; i < size; i++)
         printf("%c", worldBuffer[i]);
+    printf("|\tNumber of collisions is: %d", n_collision);
 
-    printf("|\tcurrent pos: %.2f", object->pos);
     fflush(stdout); // Clears the buffer
 }
 
@@ -95,17 +127,21 @@ int main(void)
     scanf(" %c", &input_icon);
     fflush(stdout);
 
-    struct Object1D object = {0.0f, input_velocity, 20.0f, input_icon};
-
     char space[WORLD_SIZE]; // The world in which our object will move.
-    struct Object1D *player_ptr = &object;
+
+    struct Object1D Objects[2];
+    struct Object1D object1 = {1.0f, input_velocity, 1000.0f, input_icon};
+    struct Object1D object2 = {3.0f, 0.0f, 1.0f, 'O'};
+
+    Objects[0] = object1;
+    Objects[1] = object2;
 
     printf("\033[2J"); // ANSI code to Clear Screen
     while (true)
     {
-        update_physics(player_ptr);
-        render(space, WORLD_SIZE, player_ptr);
-        usleep(16000); // 62.5 FPS = 1/0.016s
+        update_physics(Objects, 2);
+        render(space, WORLD_SIZE, Objects, 2);
+        usleep(16000);
     }
     return EXIT_SUCCESS;
 }
