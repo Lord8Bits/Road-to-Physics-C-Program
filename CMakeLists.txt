@@ -1,6 +1,6 @@
 # 1. Setup
 cmake_minimum_required(VERSION 3.28)
-project(Road-to-Physics-C-Program CXX)
+project(Road-to-Physics-C-Program CXX C)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,7 +16,7 @@ find_package(glfw3 REQUIRED)
 add_executable(Physics1D 1D/main.cpp)
 
 # --- 2D Program ---
-add_executable(Physics2D 2D/main.cpp 2D/glad.c)
+add_executable(Physics2D "2D/main.cpp" "2D/include/glad/glad.c")
 target_compile_options(Physics2D PRIVATE -Wall -O2)
 
 # --- 3D Program ---
@@ -31,5 +31,5 @@ if(UNIX)
     target_link_libraries(Physics1D m)
 endif()
 
-target_link_libraries(Physics2D PRIVATE OpenGL::GL glfw)
-target_include_directories(Physics2D PRIVATE 2D/include)
+target_link_libraries(Physics2D PRIVATE OpenGL::GL glfw dl)
+target_include_directories(Physics2D PRIVATE 2D/include/)
