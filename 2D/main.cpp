@@ -4,6 +4,8 @@
 #include "include/glad/glad.h"
 #include <GLFW/glfw3.h>
 #include <print>
+#include "HelloTriangle.h"
+#include <vector>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -30,7 +32,7 @@ int main()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     //Creating the window (Finally!) :
-    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "LearningOpenGL", NULL, NULL);
+    GLFWwindow* window{glfwCreateWindow(WIDTH, HEIGHT, "LearningOpenGL", NULL, NULL)};
     // Checking the window has been generated successfully
     if (window == NULL) {
         std::print("Failed to create GLFW window\n");
@@ -56,29 +58,34 @@ int main()
     */
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback); // calls the framebuffer_size_callback function if resized
 
-    double lastCurrentTime{};
-    bool swapColors{false};
+    // Triangle init:
+    float vertices[9] = {
+        -0.5f, -0.5f, 0.0f,
+         0.5f, -0.5f, 0.0f,
+         0.0f,  0.5f, 0.0f
+    };
 
+
+    Triangle2DMesh triangle1{initializeTriangle(vertices, sizeof(vertices))};
+
+    double currentTime{};
     // AT LAST (fr this time), we will make the loop to actually leave the window open and not instantly close:
     while (!glfwWindowShouldClose(window)) {
+        currentTime = glfwGetTime();
         // Input:
         processInput(window); // Always add events like key presses before glfwPollEvents
 
         // Render:
-        double CurrentTime{glfwGetTime()};
-        if (CurrentTime - lastCurrentTime >= 3.0) {
-            swapColors = !swapColors;
-            lastCurrentTime = CurrentTime;
-        }
+        glClearColor(0.1f, 0.3f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-        if (!swapColors) {
-            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-        }
-        else {
-            glClearColor(0.5f, 0.1f, 0.2f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-        }
+        glUseProgram(triangle1.shaderProgram);
+        glUniform1f(triangle1.uTime, static_cast<float>(currentTime));
+        glBindVertexArray(triangle1.VAO);
+
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+
+
         // Process events and swap buffers
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -86,6 +93,9 @@ int main()
 
     // To stop any communication with the OS and GPU driver
     glfwTerminate();
+
+    cleanupTriangle(triangle1);
+
 
     return 0;
 }

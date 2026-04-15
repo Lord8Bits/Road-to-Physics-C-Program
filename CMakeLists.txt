@@ -13,10 +13,13 @@ find_package(glfw3 REQUIRED)
 # -----------------------------------------------------------------------------
 
 # --- 1D Program ---
-add_executable(Physics1D 1D/main.cpp)
+add_executable(Physics1D 1D/main.c)
 
 # --- 2D Program ---
-add_executable(Physics2D "2D/main.cpp" "2D/include/glad/glad.c")
+add_executable(Physics2D
+        2D/main.cpp
+        2D/include/glad/glad.c
+        2D/HelloTriangle.cpp)
 target_compile_options(Physics2D PRIVATE -Wall -O2)
 
 # --- 3D Program ---
@@ -32,4 +35,3 @@ if(UNIX)
 endif()
 
 target_link_libraries(Physics2D PRIVATE OpenGL::GL glfw dl)
-target_include_directories(Physics2D PRIVATE 2D/include/)
