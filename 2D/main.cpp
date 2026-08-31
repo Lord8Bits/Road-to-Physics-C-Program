@@ -1,109 +1,164 @@
-//
-// Created by lorend on 11/27/25.
-//
 #include "include/glad/glad.h"
 #include <GLFW/glfw3.h>
 #include <print>
-#include "HelloTriangle.h"
+#include <iostream>
 #include <vector>
+#include "init.hpp"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 
-constexpr unsigned int WIDTH = 800;
-constexpr unsigned int HEIGHT = 600;
+constexpr int WIDTH = 1200;
+constexpr int HEIGHT = 800;
 
 int main()
-{   // Necessary to bridge the program and the GPU driver
-    glfwInit();
+{
+    /*
+     * This part initializes the glfw library and GLAD loader.
+     * It specifies the window parameters aka hint. (in this case which opengl version)
+     * Create the pointer of the window using glfwCreateWindow function.
+     * Specify the current context in this case the newly created window.
+     * Load the OpenGL functions addresses by asking the driver using glfwGetProcAddress.
+     * And map the pixels with the OpenGL coordinates using framebuffer function that gets called when resized.
+     */
+
+    OpenGLContext init(3 , 3, GLFW_OPENGL_CORE_PROFILE);
+
+    if (!init.init_GLFW()) return -1;
+    GLFWwindow *window {init.init_window(WIDTH, HEIGHT, "Hello Triangle", framebuffer_size_callback)};
+    if (window == nullptr) return -2;
+
+    if (!init.init_GL(WIDTH, HEIGHT)) return -1;
+
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     /*
-     * glfwWindowHint is used to specify the template for the next glfwCreateWindow call
-     * since GLFW acts like a state machine, you will add hints that are applied
-     * when the next window is created. If the window has already been created, changing the hints
-     * won't affect the existing window.
-    */
-
-    // Version MAJOR 3 and Version MINOR 3 means we are using opengl v3.3
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-
-    // We will use the OpenGL more modern Core Profile:
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    //Creating the window (Finally!) :
-    GLFWwindow* window{glfwCreateWindow(WIDTH, HEIGHT, "LearningOpenGL", NULL, NULL)};
-    // Checking the window has been generated successfully
-    if (window == NULL) {
-        std::print("Failed to create GLFW window\n");
-        glfwTerminate();
-        return -1;
-    }
-    // Display the window
-    glfwMakeContextCurrent(window);
-
-    // Now, we have to init GLAD so that we could use the GPU driver with openGL functions :
-    if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
-        std::print("Failed to initialize GLAD\n");
-        glfwTerminate();
-        return -1;
-    }
-    // Then, we will specify what we call Viewport, basically a coordinate system for our window:
-    glViewport(0, 0, WIDTH, HEIGHT);
-
-    /*
-     * Unfortunately, if we resize the window our viewport will be messy,
-     * rendering everything on a smaller window inside a large one.
-     * So we use glfwSetFramebufferSizeCallback to update the viewport each time the window is resized.
-    */
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback); // calls the framebuffer_size_callback function if resized
-
-    // Triangle init:
-    float vertices[9] = {
-        -0.5f, -0.5f, 0.0f,
-         0.5f, -0.5f, 0.0f,
-         0.0f,  0.5f, 0.0f
+     * This section prepares the GPU memory to send vertices in what we call VBOs.
+     * By first creating the vertices data using an array such as the triangle array,
+     * we then create the VAO which defines how to read the vertex data that we will send,
+     * and the VBO, where the vertices will be stored.
+     * You create 2 empty arrays of type unsigned int for the VBO and VAO.
+     * Generate an IDs for the VBO and VAO using glGen* functions.
+     * Bind those IDs to specify which VBO or VAO to alter in the GPU.
+     * Send the vertices data to the VBO by also specifying the size and which type of draw.
+     * And finally, set the parameters in the VAO that specify how the driver should read the data,
+     * and enable the vertex attribute.
+     * All of this will enable us to use the vertices in a shader program,
+     * which is where the calculations for lighting, shadows, colors and how the pixels react are.
+     */
+    std::vector<float> triangle{
+        0.5f , -0.5f , 0.f,
+        0.f  , 0.5f  , 0.f,
+        -0.5f, -0.5f , 0.f
     };
 
+    std::vector<GLuint> VAOs(1);
+    glGenVertexArrays(1, VAOs.data());
+    glBindVertexArray(VAOs[0]);
 
-    Triangle2DMesh triangle1{initializeTriangle(vertices, sizeof(vertices))};
+    std::vector<GLuint>  VBOs(1);
+    glGenBuffers(1, VBOs.data());
+    glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
 
-    double currentTime{};
-    // AT LAST (fr this time), we will make the loop to actually leave the window open and not instantly close:
+    glBufferData(GL_ARRAY_BUFFER,
+        static_cast<GLsizeiptr>(triangle.size() * sizeof(float)),
+        triangle.data(),
+        GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), nullptr);
+    glEnableVertexAttribArray(0);
+
+    const char *vertexShaderSource = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+
+void main()
+{
+    gl_Position = vec4(aPos, 1.0);
+}
+)";
+
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    glCompileShader(vertexShader);
+
+    int  success;
+    char infoLog[512];
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+
+    if (!success) {
+        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+    }
+
+    const char* fragmentShaderSource{
+        R"(
+#version 330 core
+out vec4 FragColor;
+uniform float uTime;
+void main()
+{
+    FragColor = vec4(
+                    sin(uTime)       *0.5f + 0.5f,
+                    sin(uTime + 2.f) *0.5f + 0.5f,
+                    sin(uTime + 4.f) *0.5f + 0.5f,
+                    1.0f);
+}
+        )"
+    };
+
+    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    glCompileShader(fragmentShader);
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+
+    if (!success) {
+        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+    }
+    unsigned int shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    infoLog[0] = '\0';
+    if(!success) {
+        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+    }
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+    GLint uTimeLoc = glGetUniformLocation(shaderProgram, "uTime");
+
     while (!glfwWindowShouldClose(window)) {
-        currentTime = glfwGetTime();
-        // Input:
-        processInput(window); // Always add events like key presses before glfwPollEvents
+        double currentTime = glfwGetTime();
+        processInput(window);
 
-        // Render:
-        glClearColor(0.1f, 0.3f, 0.3f, 1.0f);
+        glClearColor(0.545f, 0.0f, 0.545f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(triangle1.shaderProgram);
-        glUniform1f(triangle1.uTime, static_cast<float>(currentTime));
-        glBindVertexArray(triangle1.VAO);
-
+        glUseProgram(shaderProgram);
+        glUniform1f(uTimeLoc, static_cast<float>(currentTime));
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
-
-        // Process events and swap buffers
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+    glDeleteVertexArrays(1, VAOs.data());
+    glDeleteBuffers(1, VBOs.data());
+    glDeleteProgram(shaderProgram);
 
-    // To stop any communication with the OS and GPU driver
-    glfwTerminate();
-
-    cleanupTriangle(triangle1);
 
 
     return 0;
 }
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
-    // Updates Viewport
-    glViewport(0, 0, width, height);
+    glViewport(0,0, width, height);
 }
 
 void processInput(GLFWwindow *window)

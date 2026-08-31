@@ -9,7 +9,7 @@
 #define WORLD_SIZE 200
 #define EPSILON 1 // EPSILON defines the fraction of the velocity the wall absorbs.
 #define GRAVITY 0.0
-#define SUB_STEPS 100000.0
+#define SUB_STEPS 1000000.0
 int n_collision = 0;
 
 struct Object1D
@@ -90,7 +90,7 @@ void update_physics(struct Object1D *Objects, int object_count)
 void render(char *worldBuffer, int size, const struct Object1D *Objects, int object_count) {
     // 1. CLEAR the buffer (loop through and set to '.')
     for (int i = 0; i < size; i++)
-        worldBuffer[i] = '.';
+        worldBuffer[i] = ' ';
 
     for (int i = 0; i < object_count; i++)
     {
@@ -140,7 +140,7 @@ int main(void)
 
     struct Object1D Objects[2];
     struct Object1D object1 = {30.0f, input_velocity, pow(100.0, 1), input_icon};
-    struct Object1D object2 = {20.0f, 0.0f, 100.0f, 'o'};
+    struct Object1D object2 = {20.0f, 0.0f, 1.0f, 'o'};
 
     Objects[0] = object1;
     Objects[1] = object2;
