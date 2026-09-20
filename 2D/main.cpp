@@ -1,9 +1,8 @@
 #include "include/glad/glad.h"
 #include <GLFW/glfw3.h>
-#include <print>
-#include <iostream>
 #include <vector>
 #include "init.hpp"
+#include "ShaderProgram.hpp"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -30,15 +29,13 @@ int main()
 
     if (!init.init_GL(WIDTH, HEIGHT)) return -1;
 
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
     /*
      * This section prepares the GPU memory to send vertices in what we call VBOs.
      * By first creating the vertices data using an array such as the triangle array,
      * we then create the VAO which defines how to read the vertex data that we will send,
      * and the VBO, where the vertices will be stored.
      * You create 2 empty arrays of type unsigned int for the VBO and VAO.
-     * Generate an IDs for the VBO and VAO using glGen* functions.
+     * Generate IDs for the VBO and VAO using glGen* functions.
      * Bind those IDs to specify which VBO or VAO to alter in the GPU.
      * Send the vertices data to the VBO by also specifying the size and which type of draw.
      * And finally, set the parameters in the VAO that specify how the driver should read the data,
@@ -68,70 +65,9 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), nullptr);
     glEnableVertexAttribArray(0);
 
-    const char *vertexShaderSource = R"(
-#version 330 core
-layout (location = 0) in vec3 aPos;
+    ShaderProgram hello_triangle_shader("HelloTriangle", "shaders");
 
-void main()
-{
-    gl_Position = vec4(aPos, 1.0);
-}
-)";
-
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
-
-    int  success;
-    char infoLog[512];
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-
-    if (!success) {
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-    }
-
-    const char* fragmentShaderSource{
-        R"(
-#version 330 core
-out vec4 FragColor;
-uniform float uTime;
-void main()
-{
-    FragColor = vec4(
-                    sin(uTime)       *0.5f + 0.5f,
-                    sin(uTime + 2.f) *0.5f + 0.5f,
-                    sin(uTime + 4.f) *0.5f + 0.5f,
-                    1.0f);
-}
-        )"
-    };
-
-    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-    glCompileShader(fragmentShader);
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-
-    if (!success) {
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-    }
-    unsigned int shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    infoLog[0] = '\0';
-    if(!success) {
-        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
-    GLint uTimeLoc = glGetUniformLocation(shaderProgram, "uTime");
+    GLint uTimeLoc = glGetUniformLocation(hello_triangle_shader.getShaderProgram(), "uTime");
 
     while (!glfwWindowShouldClose(window)) {
         double currentTime = glfwGetTime();
@@ -140,7 +76,7 @@ void main()
         glClearColor(0.545f, 0.0f, 0.545f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(shaderProgram);
+        hello_triangle_shader.useProgram();
         glUniform1f(uTimeLoc, static_cast<float>(currentTime));
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
@@ -149,9 +85,6 @@ void main()
     }
     glDeleteVertexArrays(1, VAOs.data());
     glDeleteBuffers(1, VBOs.data());
-    glDeleteProgram(shaderProgram);
-
-
 
     return 0;
 }
